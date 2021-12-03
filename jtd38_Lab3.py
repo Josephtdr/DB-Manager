@@ -1,4 +1,3 @@
-import enum
 import sqlite3
 import re
 from employee import Employee 
@@ -6,15 +5,15 @@ import sys
 import os 
 
 class DBOperations:
-    EMAILREGEX = "(?:[a-z0-9!#$%&'*+/=?^_`{|}~-]+(?:\.[a-z0-9!#$%&'*+/=?^_`{|}~-]+)*|\"(?:[\x01-\x08\x0b\x0c\x0e-\x1f\x21\x23-\x5b\x5d-\x7f]|\\[\x01-\x09\x0b\x0c\x0e-\x7f])*\")@(?:(?:[a-z0-9](?:[a-z0-9-]*[a-z0-9])?\.)+[a-z0-9](?:[a-z0-9-]*[a-z0-9])?|\[(?:(?:(2(5[0-5]|[0-4][0-9])|1[0-9][0-9]|[1-9]?[0-9]))\.){3}(?:(2(5[0-5]|[0-4][0-9])|1[0-9][0-9]|[1-9]?[0-9])|[a-z0-9-]*[a-z0-9]:(?:[\x01-\x08\x0b\x0c\x0e-\x1f\x21-\x5a\x53-\x7f]|\\[\x01-\x09\x0b\x0c\x0e-\x7f])+)\])"
-    TITLEREGEX = "\\b(Mr|Mrs|Ms|Miss|Dr|Sir|They|Them)\\b" #pronouns ik but idk
     DATABASENAME = 'ABCdb.db'
     DEFAULTTABLENAME = 'Employee'
     DEFAULTTABLECOLUMNS = 'ID INTEGER PRIMARY KEY, Title VARCHAR(5), Forename VARCHAR(20), Surname VARCHAR(20), Email VARCHAR(20) NOT NULL, Salary int UNSIGNED NOT NULL'
 
     sql_createTable = '''create table if not exists
                 {}({});'''
-    sql_select_all = "select * from {}"
+    
+
+    curTable = ''
 
     def openConnection(self):
         self.conn = sqlite3.connect(self.DATABASENAME)
@@ -50,22 +49,14 @@ class DBOperations:
         finally:
             self.conn.close()
 
-    def createRecord(self, table):
-        sql_insert = "insert into {} values (".format(table)
-        values = []
+    def createRecord(self):
+        newRecord = globals()[self.curTable]()
+        newRecord.create_record()
+        sqlInsert = newRecord.getSqlInsert()
+        data = newRecord.getData()
         try:
             self.openConnection()
-            self.cur.execute('PRAGMA TABLE_INFO({})'.format(table))
-            results = self.cur.fetchall()
-
-            for _, name, dataType, notNull, _, pk in results:
-                if pk==1:
-                    sql_insert += "null"
-                else:
-                    sql_insert += ',?'
-                    values.append(self.dataValidation(name, dataType, notNull))
-            sql_insert += ')'
-            self.cur.execute(sql_insert, values)    
+            self.cur.execute(sqlInsert, data)
             self.conn.commit()
             print("Inserted data successfully")
         except Exception as e:
@@ -73,101 +64,55 @@ class DBOperations:
         finally:
             self.conn.close()
 
-    def dataValidation(self, name, dataType, notNull):
-        value = input("Please input {} ".format(name))
-
-        if dataType=='int UNSIGNED':
-            func = self.intCheck
-        elif name=='Email':
-            func = self.emailCheck
-        elif name=='Title':
-            func = self.titleCheck
-        elif notNull==1:
-            func = self.nullCheck
-        else:
-            return value
-
-        while(func(value)):
-            value = input("Please input a valid {}: ".format(name))
-        return value
-        
-    def intCheck(self, x):
-        return not x.isdigit()
-
-    def emailCheck(self, x):
-        return re.search(self.EMAILREGEX, x) is None
-
-    def titleCheck(self, x):
-        return re.search(self.TITLEREGEX, x) is None
-
-    def nullCheck(self, x):
-        return x == ''
-
-
-    def insert_employee_data(self, table):
-        #TODO: generalise
-        newemp = Employee()
-        emp_insert = "insert into Employee values (null,?,?,?,?,?)"
-
+    def displayAll(self): #Dynamic
+        command = "select * from {}".format(self.curTable)
         try:
             self.openConnection()
-            self.cur.execute(emp_insert, newemp.getData())
-            self.conn.commit()
-            print("Inserted data successfully")
-        except Exception as e:
-            print(e)
-        finally:
-            self.conn.close()
-
-    def displayAll(self, table): #Dynamic
-        try:
-            self.openConnection()
-            self.cur.execute(self.sql_select_all.format(table))
-            results = self.cur.fetchall()
-            headers = self.getHeaders(table)
-
-            DisplayNeat(headers, results, "{} Table:".format(table))
-        except Exception as e:
-            print(e)
-        finally:
-            self.conn.close()
-
-    def queryDatabase(self, table): #Dynamic
-        command = "select * from {} where ".format(table)
-        try:
-            self.openConnection()
-            headers = self.getHeaders(table)
-            queries = getUserQueryStuff(headers)
-            command += " and ".join(queries)
             self.cur.execute(command)
+            results = self.cur.fetchall()
+            headers = self.getHeaders(self.curTable)
+
+            self.displayNeat(headers, results, "{} Table:".format(self.curTable))
+        except Exception as e:
+            print(e)
+        finally:
+            self.conn.close()
+
+    def basicQueryDatabase(self): #Dynamic
+        command = "select * from {} where ".format(self.curTable)
+        try:
+            self.openConnection()
+            headers = self.getHeaders(self.curTable)
+            queries, values = getUserQueryStuff(headers)
+            command += " and ".join(queries)
+            self.cur.execute(command, values)
             results = self.cur.fetchall()
 
             cls()
             if len(results)==0:
                 print("\nNo Records")
             else: 
-                DisplayNeat(headers, results, "Query:")
+                self.displayNeat(headers, results, "Query:")
 
         except Exception as e:
-            print(command)
             print(e)
 
         finally:
             self.conn.close()
 
-    def updateRecord(self, table):
-        command = "update {} SET ".format(table)
+    def updateRecord(self):
+        command = "update {} SET ".format(self.curTable)
         try:
             self.openConnection()
-            queries = getUserQueryStuff(self.getHeaders(table), "UPDATE")
+            queries, valuesU = getUserQueryStuff(self.getHeaders(self.curTable), "UPDATE", "U")
             command += ", ".join(queries)
-            queries = getUserQueryStuff(self.getHeaders(table))
+            queries, valuesW = getUserQueryStuff(self.getHeaders(self.curTable))
             command += " where %s;" % (" and ".join(queries))
-            self.cur.execute(command)
+            self.cur.execute(command, valuesU | valuesW)
 
             if self.conn.total_changes != 0:
                 print("\n%d row(s) to be updated" % self.conn.total_changes)
-                if confirmAction():
+                if not confirmAction():
                     self.conn.commit()
                 else:
                     print("Cancelling!")
@@ -179,18 +124,18 @@ class DBOperations:
         finally:
             self.conn.close()
 
-    def deleteRecord(self, table): #Dynamic
-        command = "delete from {} where ".format(table)
+    def deleteRecord(self): #Dynamic
+        command = "delete from {} where ".format(self.curTable)
         try:
             self.openConnection()
-            queries = getUserQueryStuff(self.getHeaders(table))
+            queries, values = getUserQueryStuff(self.getHeaders(self.curTable))
             command += " and ".join(queries)
-            self.cur.execute(command)
+            self.cur.execute(command, values)
             
 
             if self.conn.total_changes != 0:
                 print("\n%d row(s) to be deleted" % self.conn.total_changes)
-                if confirmAction():
+                if not confirmAction():
                     self.conn.commit()
                 else:
                     print("Cancelling!")
@@ -203,16 +148,16 @@ class DBOperations:
         finally:
             self.conn.close()
 
-    def manualQuery(self, table):
+    def manualQuery(self):
         pass
 
-    def dropTable(self, table): #Dynamic
-        if confirmAction("DROP {}".format(table), "Type exactly '{}' to confirm! "):
+    def dropTable(self): #Dynamic
+        if confirmAction("DROP {}".format(self.curTable), "Type exactly '{}' to confirm! "):
             try:
                 self.openConnection()
-                self.cur.execute("drop table {};".format(table))
+                self.cur.execute("drop table {};".format(self.curTable))
                 self.conn.commit()
-                print("{} table dropped!".format(table))
+                print("{} table dropped!".format(self.curTable))
                 return True
             except Exception as e:
                 print(e)
@@ -247,20 +192,37 @@ class DBOperations:
         finally:
             self.conn.close()
 
-#COULD BE STATIC FUNCTIONS-----------------------------------------------------
+    def setCurrentTable(self, table):
+        self.curTable = table
 
-def DisplayNeat(headers, results, title):
-    f = ''
-    for i in range(len(headers)):
-        values = [len(headers[i])] + [len(str(row[i])) for row in results]
-        f += '{%d:<%d}' % (i, max(values)+1)
-    
-    print("\n{}".format(title))
-    print(f.format(*headers))
-    for row in results:
-        print(f.format(*row))
+    def displayNeat(self, headers, results, title):
+        #conv results to relavent obj
+        results = [globals()[self.curTable](*row) for row in results]
+        results = [row.getDataStr() for row in results]
+        f = ''
+        for i in range(len(headers)):
+            values = [len(headers[i])] + [len(str(row[i])) for row in results]
+            f += '{%d:<%d}' % (i, max(values)+1)
 
-def getUserQueryStuff(headers, reason="WHERE"):
+        print("\n{}".format(title))
+        print(f.format(*headers))
+        for row in results:
+            print(f.format(*row))
+
+#STATIC FUNCTIONS-----------------------------------------------------
+def getUserQueryStuff(headers, reason="WHERE", append = "W"):
+    heads = getUserHeaderSelection(headers, reason)
+
+    queries = []
+    values = {}
+    for i in heads: 
+        head = headers[int(i)-1]
+        value = input("Please input the value for {}: ".format(head)) 
+        queries.append("{0}=:{0}{1}".format(head, append))
+        values["{}{}".format(head, append)] = value
+    return queries, values
+
+def getUserHeaderSelection(headers, reason):
     headersNUM = [str(x+1) for x in list(range(len(headers)))]
     selecString = ", ".join(["[{}]{}".format(i+1, headers[i]) for i in range(len(headers))])
 
@@ -281,17 +243,9 @@ def getUserQueryStuff(headers, reason="WHERE"):
             userInput = input("Please input non duplicate intgers: ")
         finally:
             heads = list(filter(None, userInput.split(" ")))
-        
-    queries = []
-    for i in heads: 
-        head = headers[int(i)-1]
-        value = input("Please input the value for {}: ".format(head)) 
-        if not value.isdigit(): value = "'{}'".format(value)
-        queries.append("{} = {}".format(head, value))
+    return heads
 
-    return queries
-
-def confirmAction(confMsg = "confirm", warning = "Type '{}' to confirm! "):
+def confirmAction(confMsg = "exit", warning = "Type '{}' to cancel! "):
     value = input(warning.format(confMsg))
     return True if value == confMsg else False
 
@@ -331,14 +285,16 @@ def menu1():
         cls()
 
 def menu2(table, db_ops):
+    db_ops.setCurrentTable(table)
+
     display = False
     while(True):
         if display:
-            db_ops.displayAll(table)
+            db_ops.displayAll()
 
         print ("\n   {} Table Menu:".format(table))
         print ("*" * (len("   {} Table Menu:".format(table))+3))
-        print (" 1. Toggle {} table Visbility".format(table)) #TODO: make always show with visibility flag
+        print (" 1. Toggle {} table Visbility".format(table))
         print (" 2. Query %s for records" % table)
         print (" 3. Create record")
         print (" 4. Update record(s)")
@@ -354,22 +310,26 @@ def menu2(table, db_ops):
             cls()
             display = False if display else True
         elif choice == '2':
-            db_ops.queryDatabase(table)
+            db_ops.basicQueryDatabase()
+            '''
+            TODO: Advanced query with functionality such as
+                  >, <, like, count({column}), group by, having
+            '''
         elif choice == '3':
-            db_ops.createRecord(table)
+            db_ops.createRecord()
             input("\nPress enter to continue...")
             cls()
         elif choice == '4':
-            db_ops.updateRecord(table)
+            db_ops.updateRecord()
             cls()
         elif choice == '5':
-            db_ops.deleteRecord(table)
+            db_ops.deleteRecord()
             cls()
         elif choice == '6':
             #TODO: THIS V
-            db_ops.manualQuery(table)
+            db_ops.manualQuery()
         elif choice == '7':
-            if(db_ops.dropTable(table)):
+            if(db_ops.dropTable()):
                 break
             else:
                 input("\nPress enter to continue...")
