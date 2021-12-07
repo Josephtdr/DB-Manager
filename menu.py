@@ -1,7 +1,5 @@
 import sys
-import os 
-#from employee import * 
-#from TableOperations import *
+import os
 from DBOperations import *
 
 def menu1():
