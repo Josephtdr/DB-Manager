@@ -1,22 +1,26 @@
+import os
 import sqlite3
 
+'''
+Class for operations dealing with a given passed table when initialised
+'''
 class TableOperations:
     storedQuery = ''
 
     def __init__(self, tableName, obj, dbname):
         self.tableName = tableName 
-        self.obj = obj #Object representing said table 
+        self.obj = obj #Object representing said table and containing the representation rules
         self.DATABASENAME = dbname
-        self.initSQL()
-        self.initHeaders()
+        self.initialiseSQL()
+        self.initialiseHeaders()
 
-    def initSQL(self):
+    def initialiseSQL(self):
         self.SQL_selecALL = "select * from {} ".format(self.tableName)
         self.SQL_update = " update {} set ".format(self.tableName)
         self.SQL_delete = "delete from {} ".format(self.tableName)
         self.SQL_drop = "drop table {};".format(self.tableName)
         
-    def initHeaders(self):
+    def initialiseHeaders(self):
         try:
             self.openConnection()
             self.cur.execute(self.SQL_selecALL)
@@ -43,7 +47,7 @@ class TableOperations:
     
     def createRecord(self):
         tableObj = self.obj()
-        tableObj.create_record()
+        tableObj.createRecord()
         sqlInsert = tableObj.getSqlInsert()
         data = tableObj.getData()
         try:
@@ -57,7 +61,67 @@ class TableOperations:
         finally:
             self.conn.close()
 
-    def basicQueryDatabase(self, storeQuery):
+    def bulkInsertRecords(self):
+        tableObj = self.obj()
+        sqlInsert = tableObj.getSqlInsert(bulkInsert = True)
+
+        fileName = input("Please enter the .txt file to import data from: ")
+        while(fileName[-4:] != ".txt"):
+            fileName = input("Please enter a .txt file: ")
+
+        try:
+            with open(fileName, 'r') as reader:
+                rawdata = reader.readlines()
+        
+            formattedRecords = []
+            for line in rawdata:
+                print("yes " + line[-1:])
+                if line[-1:] == '\n':
+                    line = line[:-1]
+                record = tuple(line.split(","))
+                formattedRecord = self.obj(*record).getData(bulkInsert = True)
+                formattedRecords.append(formattedRecord)
+            
+        except FileNotFoundError:
+            input("\n{} not found, make sure it is in the same directory...".format(fileName))
+            return False
+        except TypeError:
+            print("\nIncorrect number of args supplied for a record.")
+            input("make sure data is tab seperated...")
+            return False
+        
+        try:
+            self.openConnection()
+            self.cur.executemany(sqlInsert, formattedRecords)
+            self.conn.commit()
+            print("Inserted data successfully")
+            input("\nPress enter to continue...")
+        except Exception as e:
+            input("\n" + str(e) + "..")
+        finally:
+            self.conn.close()
+
+    def exportToTxt(self):
+        fileName = input("Please enter the .txt file to export data to: ")
+        while(fileName[-4:] != ".txt"):
+            fileName = input("Please enter a .txt file: ")
+
+        if os.path.isfile(fileName):
+            print("\nWarning, {} already exists, overwriting file!".format(fileName))
+            if confirmAction():
+                input("\nCancelling!")
+                return False
+
+        _, data = self.queryAll()
+        dataStr = [(",".join([str(x) for x in line])+'\n') for line in data]
+
+        with open(fileName, 'w') as writer:
+            writer.writelines(dataStr)
+
+        print("\nExported data successfully")
+        input("Press enter to continue...")
+
+    def basicQueryForRecord(self, storeQuery):
         command = self.SQL_selecALL + "where "
         try:
             self.openConnection()
@@ -79,9 +143,6 @@ class TableOperations:
             print(e)
         finally:
             self.conn.close()
-
-    def advancedQueryDatabase(self, storeQuery):
-        pass
 
     def updateRecord(self, storeQuery):
         command = self.SQL_update

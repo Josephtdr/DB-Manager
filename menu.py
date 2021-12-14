@@ -8,7 +8,8 @@ def menu1():
     while(True):
         tables = db.getTables()
         possibleTables = list(db.tableObjDict.keys())
-        tblLen, postblLen = len(tables), len(possibleTables)
+        tablesLen, possibletablesLen = len(tables), len(possibleTables)
+        
         print ("\n  Menu:")
         print ("*" * (len("  Menu:")+2))
 
@@ -16,23 +17,26 @@ def menu1():
             print (" {}. Create {} Table".format(i+1, table))
 
         for i, table in enumerate(tables):
-            print(" {}. Interact with {} Table".format(i+1+postblLen, table))
-        print (" {}. Exit".format(1 + tblLen + postblLen))
+            print(" {}. Interact with {} Table".format(i+1+possibletablesLen, table))
+        print (" {}. Exit".format(1 + tablesLen + possibletablesLen))
 
         choice = input("Enter command: ")
-        while(not choice.isdigit() or int(choice) not in list(range(1, 2+tblLen+postblLen))):
+        while(not choice.isdigit() or int(choice) not in list(range(1, 2+tablesLen+possibletablesLen))):
             choice = input("Please enter a valid command: ")
         choice = int(choice)
 
-        if 1 <= choice and choice < postblLen+1:
+        #Table Creations
+        if 1 <= choice and choice < possibletablesLen+1:
             if db.createTable(possibleTables[choice-1]):
                 print("\nTable created successfully")
             else:
                 print("\nThis table is already created")
             input("Press enter to continue...")
-        elif postblLen+1 <= choice and choice < postblLen+tblLen+1:
-            menu2(db, tables[choice-1-postblLen])
-        elif choice == 1 + postblLen + tblLen:
+        #Table interactions
+        elif possibletablesLen+1 <= choice and choice < possibletablesLen+tablesLen+1:
+            menu2(db, tables[choice-1-possibletablesLen])
+        #Program exit
+        elif choice == 1 + possibletablesLen + tablesLen:
             exit()
         cls()
 
@@ -67,15 +71,14 @@ def menu2(db, table):
         print("-" * len(tmpstr))
 
         print(" 1. Query %s for records" % table)
-        print(" 2. Create record")
+        print(" 2. Create record (I. for bulk insert from .txt, E. for export)")
         print(" 3. Update record(s)")
         print(" 4. Delete record(s)")
-        print(" 5. Manual SQL Query (WARNING)")
-        print(" 6. Drop table (WARNING DATA CANNOT BE RECOVERED)")
-        print(" 7. Return to main menu")
+        print(" 5. Drop table (WARNING DATA CANNOT BE RECOVERED)")
+        print(" 6. Return to main menu")
 
         choice = input("Enter command: ")
-        while(choice not in ['v', 'm', 'V','M','1','2','3','4','5','6','7']):
+        while(choice not in ['v', 'm','i','e','V','M','I','E','1','2','3','4','5','6']):
             choice = input("Please enter a valid command: ")
         
         if choice.lower() == 'v':
@@ -84,13 +87,13 @@ def menu2(db, table):
             if not storeQuery:
                 input("\nUpdate and Delete actions will be performed on your previous query... ")
             storeQuery = not storeQuery
+        elif choice.lower() == 'e':
+            db.Table.exportToTxt()
+        elif choice.lower() == 'i':
+            db.Table.bulkInsertRecords()
 
         elif choice == '1':
-            resultsToDisplay = db.Table.basicQueryDatabase(storeQuery)
-            '''
-            TODO: Advanced query with functionality such as
-                  >, <, like, count({column}), group by, having
-            '''
+            resultsToDisplay = db.Table.basicQueryForRecord(storeQuery)
         elif choice == '2':
             db.Table.createRecord()
         elif choice == '3':
@@ -98,14 +101,11 @@ def menu2(db, table):
         elif choice == '4':
             db.Table.deleteRecord(storeQuery)
         elif choice == '5':
-            #TODO: THIS V
-            resultsToDisplay = db.Table.manualQuery()
-        elif choice == '6':
             if(db.Table.dropTable()):
                 break
             else:
                 input("Press enter to continue...")
-        elif choice == '7':
+        elif choice == '6':
             break;
 
 def displayNeat(headers, results, obj, title):

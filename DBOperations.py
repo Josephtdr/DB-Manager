@@ -1,14 +1,20 @@
 import sqlite3
 from employee import Employee 
+from dummytable import Dummy
 from TableOperations import TableOperations
 
+'''
+Class for operations dealing with table creation
+and initialising specific tables
+'''
 class DBOperations:
     databaseName = 'ABCdb.db'
     SQL_createTable = '''create table if not exists
                 {}({});'''
 
     tableObjDict = {
-            "Employee": Employee
+            "Employee": Employee,
+            "Dummy" : Dummy
     }
     
     def openTable(self, table):

@@ -1,43 +1,48 @@
-class Dummy:
-    sqlInsert = "insert into Dummy values (null,?,?,?,?,?);"
+from TableABC import TableABC
+
+class Dummy(TableABC):
+    sqlInsert = "insert into Dummy values ({},?,?,?);"
     tableName = 'Dummy'
-    tableColumns = 'ID INTEGER PRIMARY KEY, Title VARCHAR(5), Forename VARCHAR(20), Surname VARCHAR(20), Email VARCHAR(20) NOT NULL, Salary int UNSIGNED NOT NULL'
-
-    def __init__(self, ID = 0, title = '', forename = '', 
-            surname = '', email = '', salary = 0):
-        self.ID = ID
-        self.title = title
-        self.forename = forename
-        self.surname = surname
-        self.email = email
-        self.salary = salary
+    tableColumns = 'ID INTEGER PRIMARY KEY, Department VARCHAR(20), BossID int UNSIGNED NOT NULL, NumEmployees int UNSIGNED NOT NULL'
     
-    def create_record(self):
-        self.title = self.new_title()
-        self.forename = self.new_forename()
-        self.surname = self.new_surname()
-        self.email = self.new_email()
-        self.salary = self.new_salary()
 
-    def getVariableValidation(self, header):
-        funcDict = {
+
+    def __init__(self, ID = 0, department = '', bossID = 0, 
+            numEmployees = 0):
+        self.ID = ID
+        self.department = department
+        self.bossID = bossID
+        self.numEmployees = numEmployees
+
+        self.funcDict = {
             "ID": self.new_id,
-            "Title": self.new_title,
-            "Forename": self.new_forename,
-            "Surname": self.new_surname,
-            "Email": self.new_email,
-            "Salary": self.new_salary
+            "Department": self.new_department,
+            "BossID": self.new_bossID,
+            "NumEmployees": self.new_numEmployees,
         }
-        validationFunc = funcDict[header]
-        return validationFunc()
+    
+    def createRecord(self):
+        self.department = self.new_department()
+        self.bossID = self.new_bossID()
+        self.numEmployees = self.new_numEmployees()
 
+    def new_id(self):
+        return self.integerValidation("the ID")
 
-    def getData(self):
-        return (self.title, self.forename, self.surname, self.email, self.salary)
+    def new_department(self):
+        return self.stringValidation("the Department name", 20)
+
+    def new_bossID(self):
+        return self.integerValidation("the Departments Boss ID")
+
+    def new_numEmployees(self):
+        return self.integerValidation("the number of Employees")
+
+    def getData(self, bulkInsert = False):
+        if bulkInsert:
+            return (self.ID, self.title, self.forename, self.surname, self.email, self.salary)
+        else:
+            return (self.department, self.bossID, self.numEmployees)
 
     def getDataStr(self):
-        return [self.ID, self.title, self.forename, self.surname,
-                self.email, "£{:,.2f}".format(self.salary/100)]
-
-    def getSqlInsert(self):
-        return self.sqlInsert
+        return [self.ID, self.department, self.bossID, self.numEmployees]
