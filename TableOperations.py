@@ -75,7 +75,6 @@ class TableOperations:
         
             formattedRecords = []
             for line in rawdata:
-                print("yes " + line[-1:])
                 if line[-1:] == '\n':
                     line = line[:-1]
                 record = tuple(line.split(","))
